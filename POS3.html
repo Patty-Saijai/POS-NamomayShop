@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ระบบ POS ร้านนะโมเมช็อป - สแกนบาร์โค้ดได้</title>
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
+    <!-- เพิ่ม QuaggaJS สำหรับสแกนบาร์โค้ด -->
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Sarabun', 'Prompt', 'Kanit', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 10px;
+            touch-action: manipulation;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 15px 0;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+        }
+        
+        .store-info h1 {
+            font-size: clamp(1.5em, 4vw, 2.2em);
+            margin-bottom: 5px;
+        }
+        
+        .store-info p {
+            opacity: 0.9;
+            font-size: clamp(0.8em, 3vw, 1em);
+        }
+        
+        .datetime {
+            text-align: right;
+            font-size: clamp(0.7em, 2.5vw, 0.9em);
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            padding: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 10px;
+                padding: 10px;
+            }
+        }
+        
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e1e8ed;
+            min-height: 400px;
+        }
+        
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #3498db;
+            font-size: clamp(1.2em, 3.5vw, 1.5em);
+        }
+        
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+            max-height: 40vh;
+            overflow-y: auto;
+            padding: 8px;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .product-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .product-card:active {
+            transform: scale(0.95);
+        }
+        
+        .product-name {
+            font-weight: bold;
+            margin-bottom: 6px;
+            font-size: clamp(0.9em, 2.5vw, 1em);
+            color: #2c3e50;
+        }
+        
+        .product-price {
+            color: #27ae60;
+            font-weight: bold;
+            font-size: clamp(1em, 2.8vw, 1.1em);
+            margin-bottom: 4px;
+        }
+        
+        .product-stock {
+            color: #7f8c8d;
+            font-size: clamp(0.8em, 2.2vw, 0.85em);
+        }
+        
+        .barcode-section {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .barcode-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: clamp(1em, 2.8vw, 1.1em);
+            font-weight: bold;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+        }
+        
+        .barcode-btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .scanner-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: black;
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+        }
+        
+        .scanner-video {
+            width: 100%;
+            height: 70%;
+            object-fit: cover;
+        }
+        
+        .scanner-controls {
+            background: white;
+            padding: 20px;
+            height: 30%;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .scanner-result {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .scanner-close {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        #interactive.viewport {
+            position: relative;
+            width: 100%;
+            height: auto;
+            overflow: hidden;
+            text-align: center;
+        }
+        
+        #interactive.viewport canvas, #interactive.viewport video {
+            max-width: 100%;
+            width: 100%;
+        }
+        
+        canvas.drawing, canvas.drawingBuffer {
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        
+        .cart-table-container {
+            overflow-x: auto;
+            margin-bottom: 15px;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .cart-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 500px;
+        }
+        
+        .cart-table th, .cart-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            font-size: clamp(0.8em, 2.5vw, 0.9em);
+        }
+        
+        .quantity-control {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        .quantity-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .quantity-input {
+            width: 45px;
+            text-align: center;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 4px;
+            font-weight: bold;
+        }
+        
+        .remove-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .total-section {
+            text-align: right;
+            margin-bottom: 15px;
+            font-size: clamp(1.1em, 3vw, 1.3em);
+            font-weight: bold;
+            background: #ecf0f1;
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .payment-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .payment-input {
+            padding: 12px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: clamp(1em, 2.8vw, 1.1em);
+        }
+        
+        .change-display {
+            background: #2ecc71;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .change-negative {
+            background: #e74c3c;
+        }
+        
+        .btn {
+            padding: clamp(12px, 3vw, 15px) clamp(15px, 4vw, 20px);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: clamp(1em, 2.8vw, 1.1em);
+            font-weight: bold;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+        }
+        
+        .print-btn {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .manual-input-section {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+        
+        .manual-barcode-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #f39c12;
+            border-radius: 8px;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+        
+        .search-box {
+            margin-bottom: 12px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: clamp(0.9em, 2.5vw, 1em);
+        }
+        
+        .category-filter {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .category-btn {
+            padding: 6px 12px;
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: clamp(0.8em, 2.2vw, 0.85em);
+        }
+        
+        .category-btn.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .empty-cart {
+            text-align: center;
+            padding: 30px;
+            color: #7f8c8d;
+        }
+
+        /* สไตล์ใบเสร็จ */
+        .receipt {
+            background: white;
+            border: 2px dashed #bdc3c7;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            display: none;
+        }
+
+        .receipt.show {
+            display: block;
+        }
+
+        .receipt-header {
+            text-align: center;
+            margin-bottom: 15px;
+            border-bottom: 1px dashed #333;
+            padding-bottom: 10px;
+        }
+
+        .receipt-header h3 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+
+        .receipt-items {
+            margin-bottom: 15px;
+        }
+
+        .receipt-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .receipt-total {
+            border-top: 1px dashed #333;
+            padding-top: 10px;
+            font-weight: bold;
+            text-align: right;
+        }
+
+        .receipt-footer {
+            text-align: center;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px dashed #333;
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        footer {
+            text-align: center;
+            padding: 12px;
+            background: #ecf0f1;
+            color: #7f8c8d;
+        }
+
+        @media (max-width: 480px) {
+            .product-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+            
+            .scanner-controls {
+                padding: 15px;
+            }
+
+            .receipt {
+                padding: 15px;
+                margin-top: 15px;
+            }
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .receipt, .receipt * {
+                visibility: visible;
+            }
+            .receipt {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                border: none;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="store-info">
+                    <h1>🛒 ร้านนะโมเมช็อป</h1>
+                    <p>ระบบ POS - สแกนบาร์โค้ดได้</p>
+                </div>
+                <div class="datetime">
+                    <div id="currentDate"></div>
+                    <div id="currentTime"></div>
+                </div>
+            </div>
+        </header>
+        
+        <div class="alert hidden" id="alertMessage"></div>
+        
+        <div class="main-content">
+            <!-- ส่วนสินค้า -->
+            <div class="section">
+                <h2>📦 สินค้าในร้าน</h2>
+                
+                <div class="barcode-section">
+                    <button id="startScanner" class="barcode-btn">
+                        📷 เปิดกล้องสแกนบาร์โค้ด
+                    </button>
+                    <div class="manual-input-section">
+                        <input type="text" id="manualBarcode" class="manual-barcode-input" 
+                               placeholder="หรือกรอกบาร์โค้ดที่นี่..." inputmode="numeric">
+                        <button id="searchBarcode" class="btn" style="background: #f39c12; color: white;">
+                            🔍 ค้นหาด้วยบาร์โค้ด
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="search-box">
+                    <input type="text" id="searchProduct" class="search-input" placeholder="🔍 ค้นหาสินค้า...">
+                </div>
+                
+                <div class="category-filter" id="categoryFilter">
+                    <!-- ปุ่มหมวดหมู่จะถูกสร้างโดย JavaScript -->
+                </div>
+                
+                <div class="product-grid" id="productGrid">
+                    <!-- สินค้าจะถูกโหลดโดย JavaScript -->
+                </div>
+            </div>
+            
+            <!-- ส่วนขาย -->
+            <div class="section">
+                <h2>🛒 รายการขาย</h2>
+                
+                <div class="cart-table-container">
+                    <table class="cart-table">
+                        <thead>
+                            <tr>
+                                <th>สินค้า</th>
+                                <th>ราคา</th>
+                                <th>จำนวน</th>
+                                <th>รวม</th>
+                                <th>ลบ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cartItems">
+                            <!-- รายการสินค้าในตะกร้าจะแสดงที่นี่ -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="emptyCartMessage" class="empty-cart hidden">
+                    <i>🛒</i>
+                    <p>ไม่มีสินค้าในตะกร้า</p>
+                    <p>เลือกสินค้าหรือสแกนบาร์โค้ดเพื่อเริ่มขาย</p>
+                </div>
+                
+                <div class="total-section">
+                    <p>💰 รวมทั้งหมด: <span id="totalAmount">0.00</span> บาท</p>
+                </div>
+                
+                <div class="payment-section">
+                    <input type="number" id="cashReceived" class="payment-input" placeholder="💵 เงินที่รับมา (บาท)" min="0">
+                    <div class="change-display" id="changeDisplay">
+                        <p>💰 เงินทอน: <span id="changeAmount">0.00</span> บาท</p>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button id="checkoutBtn" class="btn btn-success">✅ ชำระเงิน</button>
+                        <button id="clearCartBtn" class="btn btn-danger">🗑️ ล้างตะกร้า</button>
+                    </div>
+                </div>
+
+                <!-- ส่วนใบเสร็จ -->
+                <div class="receipt" id="receipt">
+                    <div class="receipt-header">
+                        <h3>🛒 ร้านนะโมเมช็อป</h3>
+                        <p>ใบเสร็จรับเงิน</p>
+                        <p id="receiptDateTime"></p>
+                    </div>
+                    <div class="receipt-items" id="receiptItems">
+                        <!-- รายการสินค้าในใบเสร็จ -->
+                    </div>
+                    <div class="receipt-total">
+                        <p>รวม: <span id="receiptTotal">0.00</span> บาท</p>
+                        <p>เงินรับ: <span id="receiptCash">0.00</span> บาท</p>
+                        <p>เงินทอน: <span id="receiptChange">0.00</span> บาท</p>
+                    </div>
+                    <div class="receipt-footer">
+                        <p>ขอบคุณที่ใช้บริการ</p>
+                        <p>Tel: 02-123-4567</p>
+                    </div>
+                    <div class="btn-group" style="margin-top: 15px;">
+                        <button id="printReceiptBtn" class="btn print-btn">🖨️ พิมพ์ใบเสร็จ</button>
+                        <button id="newSaleBtn" class="btn btn-primary">🔄 ขายใหม่</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>ระบบ POS ร้านนะโมเมช็อป | สแกนบาร์โค้ดได้ | © 2023</p>
+        </footer>
+    </div>
+
+    <!-- Scanner Overlay -->
+    <div id="scannerOverlay" class="scanner-container">
+        <div id="interactive" class="viewport"></div>
+        <div class="scanner-controls">
+            <div class="scanner-result" id="scannerResult">
+                🎯 เล็งบาร์โค้ดไปที่กล้อง
+            </div>
+            <button id="closeScanner" class="scanner-close">ปิดกล้อง</button>
+        </div>
+    </div>
+
+    <script>
+        // ข้อมูลสินค้าตัวอย่าง (มีบาร์โค้ด)
+        let products = [
+            { id: 1, name: 'น้ำดื่มคริสตัล', price: 7, stock: 50, category: 'เครื่องดื่ม', barcode: '8850123111551' },
+            { id: 2, name: 'นมยูเอชที', price: 12, stock: 30, category: 'เครื่องดื่ม', barcode: '8850123111568' },
+            { id: 3, name: 'โค้กกระป๋อง', price: 15, stock: 40, category: 'เครื่องดื่ม', barcode: '8850123111575' },
+            { id: 4, name: 'บะหมี่กึ่งสำเร็จรูป', price: 8, stock: 60, category: 'อาหาร', barcode: '8850123111582' },
+            { id: 5, name: 'ไข่ไก่ 10 ฟอง', price: 45, stock: 25, category: 'อาหาร', barcode: '8850123111599' },
+            { id: 6, name: 'ข้าวสาร 5 กก.', price: 120, stock: 15, category: 'อาหาร', barcode: '8850123111605' },
+            { id: 7, name: 'ขนมปัง', price: 25, stock: 40, category: 'อาหาร', barcode: '8850123111612' },
+            { id: 8, name: 'กาแฟสำเร็จรูป', price: 35, stock: 20, category: 'เครื่องดื่ม', barcode: '8850123111629' },
+            { id: 9, name: 'น้ำปลา', price: 18, stock: 30, category: 'เครื่องปรุง', barcode: '8850123111636' },
+            { id: 10, name: 'ผงซักฟอก', price: 55, stock: 25, category: 'ของใช้', barcode: '8850123111643' }
+        ];
+
+        let cart = [];
+        let selectedCategory = 'ทั้งหมด';
+        let isScanning = false;
+
+        // โหลดข้อมูลจาก Local Storage
+        function loadFromLocalStorage() {
+            const savedProducts = localStorage.getItem('posProducts');
+            if (savedProducts) {
+                try {
+                    const parsed = JSON.parse(savedProducts);
+                    // รักษาบาร์โค้ดเดิมหากมี
+                    products = parsed.map(product => {
+                        const original = products.find(p => p.id === product.id);
+                        return {
+                            ...product,
+                            barcode: original ? original.barcode : product.barcode
+                        };
+                    });
+                } catch (e) {
+                    console.error('Error loading from localStorage:', e);
+                }
+            }
+        }
+
+        // บันทึกข้อมูล
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem('posProducts', JSON.stringify(products));
+            } catch (e) {
+                console.error('Error saving to localStorage:', e);
+            }
+        }
+
+        // ฟังก์ชันแสดงวันที่และเวลาปัจจุบัน
+        function updateDateTime() {
+            const now = new Date();
+            const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('th-TH', dateOptions);
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('th-TH', timeOptions);
+        }
+
+        // ฟังก์ชันแสดงข้อความแจ้งเตือน
+        function showAlert(message, type) {
+            const alertDiv = document.getElementById('alertMessage');
+            alertDiv.textContent = message;
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                alertDiv.classList.add('hidden');
+            }, 3000);
+        }
+
+        // ฟังก์ชันค้นหาสินค้าด้วยบาร์โค้ด
+        function findProductByBarcode(barcode) {
+            return products.find(product => product.barcode === barcode);
+        }
+
+        // ฟังก์ชันเพิ่มสินค้าจากบาร์โค้ด
+        function addProductByBarcode(barcode) {
+            const product = findProductByBarcode(barcode);
+            if (product) {
+                addToCart(product);
+                showAlert(`พบสินค้า: ${product.name}`, 'success');
+                return true;
+            } else {
+                showAlert('ไม่พบสินค้าที่ตรงกับบาร์โค้ดนี้', 'error');
+                return false;
+            }
+        }
+
+        // ฟังก์ชันเริ่มสแกนบาร์โค้ด
+        function startBarcodeScanner() {
+            const scannerOverlay = document.getElementById('scannerOverlay');
+            scannerOverlay.style.display = 'flex';
+            
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#interactive'),
+                    constraints: {
+                        width: 640,
+                        height: 480,
+                        facingMode: "environment"
+                    }
+                },
+                decoder: {
+                    readers: [
+                        "code_128_reader",
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_39_reader",
+                        "upc_reader",
+                        "upc_e_reader"
+                    ]
+                },
+                locate: true
+            }, function(err) {
+                if (err) {
+                    console.error(err);
+                    showAlert('ไม่สามารถเปิดกล้องได้', 'error');
+                    closeScanner();
+                    return;
+                }
+                Quagga.start();
+                isScanning = true;
+            });
+
+            Quagga.onDetected(function(result) {
+                if (isScanning) {
+                    const code = result.codeResult.code;
+                    document.getElementById('scannerResult').textContent = `📦 พบบาร์โค้ด: ${code}`;
+                    
+                    if (addProductByBarcode(code)) {
+                        setTimeout(() => {
+                            closeScanner();
+                        }, 1000);
+                    }
+                    
+                    isScanning = false;
+                    setTimeout(() => {
+                        isScanning = true;
+                    }, 2000);
+                }
+            });
+        }
+
+        // ฟังก์ชันปิดสแกนเนอร์
+        function closeScanner() {
+            Quagga.stop();
+            document.getElementById('scannerOverlay').style.display = 'none';
+            document.getElementById('scannerResult').textContent = '🎯 เล็งบาร์โค้ดไปที่กล้อง';
+            isScanning = false;
+        }
+
+        // ฟังก์ชันสร้างปุ่มหมวดหมู่
+        function createCategoryFilter() {
+            const categoryFilter = document.getElementById('categoryFilter');
+            const categories = ['ทั้งหมด', ...new Set(products.map(product => product.category))];
+            
+            categoryFilter.innerHTML = '';
+            
+            categories.forEach(category => {
+                const button = document.createElement('button');
+                button.className = `category-btn ${category === selectedCategory ? 'active' : ''}`;
+                button.textContent = category;
+                button.addEventListener('click', () => {
+                    selectedCategory = category;
+                    createCategoryFilter();
+                    displayProducts();
+                });
+                
+                categoryFilter.appendChild(button);
+            });
+        }
+
+        // ฟังก์ชันแสดงสินค้า
+        function displayProducts() {
+            const productGrid = document.getElementById('productGrid');
+            productGrid.innerHTML = '';
+            
+            const searchTerm = document.getElementById('searchProduct').value.toLowerCase();
+            
+            let filteredProducts = products.filter(product => 
+                product.name.toLowerCase().includes(searchTerm) || 
+                product.category.toLowerCase().includes(searchTerm)
+            );
+            
+            if (selectedCategory !== 'ทั้งหมด') {
+                filteredProducts = filteredProducts.filter(product => product.category === selectedCategory);
+            }
+            
+            if (filteredProducts.length === 0) {
+                productGrid.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #7f8c8d;">ไม่พบสินค้าที่ค้นหา</p>';
+                return;
+            }
+            
+            filteredProducts.forEach(product => {
+                const productCard = document.createElement('div');
+                productCard.className = 'product-card';
+                productCard.innerHTML = `
+                    <div class="product-name">${product.name}</div>
+                    <div class="product-price">${product.price.toFixed(2)} บาท</div>
+                    <div class="product-stock">คงเหลือ: ${product.stock} ชิ้น</div>
+                    ${product.barcode ? `<div style="font-size: 0.7em; color: #7f8c8d; margin-top: 5px;">📟 ${product.barcode}</div>` : ''}
+                `;
+                
+                productCard.addEventListener('click', () => {
+                    addToCart(product);
+                });
+                
+                productGrid.appendChild(productCard);
+            });
+        }
+
+        // ฟังก์ชันเพิ่มสินค้าลงตะกร้า
+        function addToCart(product) {
+            const existingItem = cart.find(item => item.id === product.id);
+            
+            if (existingItem) {
+                if (existingItem.quantity < product.stock) {
+                    existingItem.quantity++;
+                } else {
+                    showAlert(`สินค้า ${product.name} ในสต็อกไม่เพียงพอ`, 'error');
+                    return;
+                }
+            } else {
+                if (product.stock > 0) {
+                    cart.push({
+                        id: product.id,
+                        name: product.name,
+                        price: product.price,
+                        quantity: 1
+                    });
+                } else {
+                    showAlert(`สินค้า ${product.name} หมดสต็อก`, 'error');
+                    return;
+                }
+            }
+            
+            updateCartDisplay();
+            showAlert(`เพิ่ม ${product.name} ลงในตะกร้าแล้ว`, 'success');
+        }
+
+        // ฟังก์ชันอัพเดทการแสดงผลตะกร้า
+        function updateCartDisplay() {
+            const cartItems = document.getElementById('cartItems');
+            const emptyCartMessage = document.getElementById('emptyCartMessage');
+            
+            let total = 0;
+            
+            if (cart.length === 0) {
+                cartItems.innerHTML = '';
+                emptyCartMessage.classList.remove('hidden');
+            } else {
+                emptyCartMessage.classList.add('hidden');
+                cartItems.innerHTML = '';
+                
+                cart.forEach(item => {
+                    const itemTotal = item.price * item.quantity;
+                    total += itemTotal;
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${item.name}</td>
+                        <td>${item.price.toFixed(2)}</td>
+                        <td>
+                            <div class="quantity-control">
+                                <button class="quantity-btn minus" data-id="${item.id}">-</button>
+                                <input type="number" class="quantity-input" value="${item.quantity}" min="1" data-id="${item.id}">
+                                <button class="quantity-btn plus" data-id="${item.id}">+</button>
+                            </div>
+                        </td>
+                        <td>${itemTotal.toFixed(2)}</td>
+                        <td><button class="remove-btn" data-id="${item.id}">ลบ</button></td>
+                    `;
+                    
+                    cartItems.appendChild(row);
+                });
+            }
+            
+            document.getElementById('totalAmount').textContent = total.toFixed(2);
+            calculateChange();
+            addCartEventListeners();
+        }
+
+        // ฟังก์ชันเพิ่ม event listeners
+        function addCartEventListeners() {
+            document.querySelectorAll('.quantity-btn.minus').forEach(btn => {
+                btn.onclick = (e) => {
+                    const id = parseInt(e.target.getAttribute('data-id'));
+                    updateQuantity(id, -1);
+                };
+            });
+            
+            document.querySelectorAll('.quantity-btn.plus').forEach(btn => {
+                btn.onclick = (e) => {
+                    const id = parseInt(e.target.getAttribute('data-id'));
+                    updateQuantity(id, 1);
+                };
+            });
+            
+            document.querySelectorAll('.remove-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    const id = parseInt(e.target.getAttribute('data-id'));
+                    removeFromCart(id);
+                };
+            });
+        }
+
+        // ฟังก์ชันอัพเดทจำนวนสินค้า
+        function updateQuantity(id, change) {
+            const item = cart.find(item => item.id === id);
+            if (item) {
+                const product = products.find(p => p.id === id);
+                const newQuantity = item.quantity + change;
+                
+                if (newQuantity < 1) {
+                    removeFromCart(id);
+                } else if (newQuantity > product.stock) {
+                    showAlert('สินค้าในสต็อกไม่เพียงพอ', 'error');
+                } else {
+                    item.quantity = newQuantity;
+                    updateCartDisplay();
+                }
+            }
+        }
+
+        // ฟังก์ชันลบสินค้า
+        function removeFromCart(id) {
+            const item = cart.find(item => item.id === id);
+            if (item) {
+                cart = cart.filter(item => item.id !== id);
+                updateCartDisplay();
+                showAlert(`ลบ ${item.name} ออกจากตะกร้าแล้ว`, 'success');
+            }
+        }
+
+        // ฟังก์ชันคำนวณเงินทอน
+        function calculateChange() {
+            const cashReceived = parseFloat(document.getElementById('cashReceived').value) || 0;
+            const total = parseFloat(document.getElementById('totalAmount').textContent) || 0;
+            const change = cashReceived - total;
+            const changeDisplay = document.getElementById('changeDisplay');
+            
+            document.getElementById('changeAmount').textContent = Math.abs(change).toFixed(2);
+            
+            if (change >= 0) {
+                changeDisplay.className = 'change-display';
+            } else {
+                changeDisplay.className = 'change-display change-negative';
+            }
+        }
+
+        // ฟังก์ชันเคลียร์รายการขาย
+        function clearSale() {
+            cart = [];
+            document.getElementById('cashReceived').value = '';
+            updateCartDisplay();
+            calculateChange();
+        }
+
+        // ฟังก์ชันสร้างใบเสร็จ
+        function generateReceipt(cashReceived, change) {
+            const receipt = document.getElementById('receipt');
+            const receiptItems = document.getElementById('receiptItems');
+            const total = parseFloat(document.getElementById('totalAmount').textContent);
+            
+            const now = new Date();
+            document.getElementById('receiptDateTime').textContent = now.toLocaleString('th-TH');
+            
+            // ล้างรายการเก่า
+            receiptItems.innerHTML = '';
+            
+            // เพิ่มรายการสินค้า
+            cart.forEach(item => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'receipt-item';
+                itemElement.innerHTML = `
+                    <span>${item.name} x${item.quantity}</span>
+                    <span>${(item.price * item.quantity).toFixed(2)}</span>
+                `;
+                receiptItems.appendChild(itemElement);
+            });
+            
+            // อัพเดทยอดรวม
+            document.getElementById('receiptTotal').textContent = total.toFixed(2);
+            document.getElementById('receiptCash').textContent = cashReceived.toFixed(2);
+            document.getElementById('receiptChange').textContent = Math.abs(change).toFixed(2);
+            
+            // แสดงใบเสร็จ
+            receipt.classList.add('show');
+        }
+
+        // ฟังก์ชันพิมพ์ใบเสร็จ
+        function printReceipt() {
+            window.print();
+        }
+
+        // ฟังก์ชันเริ่มการขายใหม่
+        function newSale() {
+            clearSale();
+            document.getElementById('receipt').classList.remove('show');
+            showAlert('เริ่มการขายใหม่แล้ว', 'success');
+        }
+
+        // ฟังก์ชันชำระเงิน
+        function checkout() {
+            if (cart.length === 0) {
+                showAlert('ไม่มีสินค้าในตะกร้า', 'error');
+                return;
+            }
+            
+            const cashReceived = parseFloat(document.getElementById('cashReceived').value) || 0;
+            const total = parseFloat(document.getElementById('totalAmount').textContent) || 0;
+            
+            if (cashReceived < total) {
+                showAlert('เงินที่รับมาไม่เพียงพอ', 'error');
+                return;
+            }
+            
+            // อัพเดทสต็อกสินค้า
+            cart.forEach(item => {
+                const product = products.find(p => p.id === item.id);
+                if (product) {
+                    product.stock -= item.quantity;
+                }
+            });
+            
+            const change = cashReceived - total;
+            
+            // สร้างใบเสร็จ
+            generateReceipt(cashReceived, change);
+            
+            // บันทึกข้อมูล
+            saveToLocalStorage();
+            
+            showAlert(`ขายสินค้าสำเร็จ! เงินทอน ${change.toFixed(2)} บาท`, 'success');
+            
+            // เคลียร์รายการขายอัตโนมัติ
+            setTimeout(() => {
+                clearSale();
+            }, 1000);
+            
+            // โหลดสินค้าใหม่เพื่ออัพเดทสต็อก
+            displayProducts();
+        }
+
+        // ฟังก์ชันล้างตะกร้า
+        function clearCart() {
+            if (cart.length === 0) {
+                showAlert('ตะกร้าว่างอยู่แล้ว', 'error');
+                return;
+            }
+            
+            if (confirm('ต้องการล้างรายการขายทั้งหมดใช่หรือไม่?')) {
+                clearSale();
+                showAlert('ล้างตะกร้าสำเร็จ', 'success');
+            }
+        }
+
+        // ตั้งค่า event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFromLocalStorage();
+            createCategoryFilter();
+            displayProducts();
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            
+            // Event Listeners
+            document.getElementById('checkoutBtn').addEventListener('click', checkout);
+            document.getElementById('clearCartBtn').addEventListener('click', clearCart);
+            document.getElementById('cashReceived').addEventListener('input', calculateChange);
+            document.getElementById('searchProduct').addEventListener('input', displayProducts);
+            document.getElementById('startScanner').addEventListener('click', startBarcodeScanner);
+            document.getElementById('closeScanner').addEventListener('click', closeScanner);
+            document.getElementById('searchBarcode').addEventListener('click', function() {
+                const barcode = document.getElementById('manualBarcode').value.trim();
+                if (barcode) {
+                    addProductByBarcode(barcode);
+                    document.getElementById('manualBarcode').value = '';
+                } else {
+                    showAlert('กรุณากรอกบาร์โค้ด', 'error');
+                }
+            });
+            document.getElementById('printReceiptBtn').addEventListener('click', printReceipt);
+            document.getElementById('newSaleBtn').addEventListener('click', newSale);
+            
+            // Enter key สำหรับช่องกรอกบาร์โค้ด
+            document.getElementById('manualBarcode').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('searchBarcode').click();
+                }
+            });
+            
+            window.addEventListener('beforeunload', saveToLocalStorage);
+        });
+    </script>
+</body>
+</html>
